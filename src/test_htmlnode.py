@@ -1,6 +1,7 @@
 import unittest
 
 from htmlnode import HTMLNode, LeafNode, ParentNode
+from conversions import markdown_to_blocks
 
 class TestHTMLNode(unittest.TestCase):
     def test_eq(self):
@@ -58,6 +59,50 @@ class TestHTMLNode(unittest.TestCase):
             parent_node.to_html(),
             "<div><span><span><span><span><b>greatgreatgreatgrandchild</b></span></span></span></span></div>"
         )
+
+    def test_markdown_to_blocks(self):
+        md = """
+    This is **bolded** paragraph
+
+    This is another paragraph with _italic_ text and `code` here
+    This is the same paragraph on a new line
+
+    - This is a list
+    - with items
+    """
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            blocks,
+            [
+                "This is **bolded** paragraph",
+                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line",
+                "- This is a list\n- with items",
+            ],
+        )
+
+    def test_markdown_to_blocks_2(self):
+        md = """
+
+    Check out this link: [Click Here!](www.youtube.com)
+
+    This is another paragraph with _italic_ text and `code` here
+    This is the same paragraph on a new line
+    Check out this link, too: [And Here!](www.google.com)
+
+    - This is a list
+    - with items
+    - and an image: ![it's an image idiot](https://i.imgur.com/fJRm4Vk.jpeg) <- right there
+    """
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            blocks,
+            [
+                "Check out this link: [Click Here!](www.youtube.com)",
+                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line\nCheck out this link, too: [And Here!](www.google.com)",
+                "- This is a list\n- with items\n- and an image: ![it's an image idiot](https://i.imgur.com/fJRm4Vk.jpeg) <- right there",
+            ],
+        )
+
 
 
     

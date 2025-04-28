@@ -1,4 +1,13 @@
+from enum import Enum
 from textnode import TextType, TextNode
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
 
 class HTMLNode:
     def __init__(self, tag=None, value=None, children=None, props=None):
