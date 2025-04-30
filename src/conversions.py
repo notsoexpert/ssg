@@ -1,5 +1,6 @@
 import re
 
+from htmlnode import BlockType
 from textnode import TextType, TextNode
 
 def split_nodes_delimiter(old_nodes, delimiter, text_type):
@@ -94,24 +95,72 @@ def text_to_textnodes(text):
     nodes = split_nodes_link(nodes)
     return nodes
 
+def strip_lines(blocks, index):
+    block_lines = blocks[index].splitlines()
+    i = 0
+    while i < len(block_lines):
+        block_lines[i] = block_lines[i].strip()
+        if len(block_lines[i]) == 0:
+            block_lines.pop(i)
+            continue
+        i += 1
+    blocks[index] = '\n'.join(block_lines)
+
 def markdown_to_blocks(markdown):
     blocks = markdown.split('\n\n')
     index = 0
     while index < len(blocks):
+        blocks[index] = blocks[index].strip()
         if len(blocks[index]) == 0:
             blocks.pop(index)
             continue
-
-        block_lines = blocks[index].splitlines()
-        i = 0
-        while i < len(block_lines):
-            block_lines[i] = block_lines[i].strip('\n ')
-            if len(block_lines[i]) == 0:
-                block_lines.pop(i)
-                continue
-            i += 1
-        blocks[index] = '\n'.join(block_lines)
-
         index += 1
 
     return blocks
+
+def block_to_block_type(md):
+    print("***************************")
+    print(f"Block length: {len(md)}\nBlock:\n{md}")
+    if len(md) == 0:
+        raise Exception("empty block has no block type")
+    
+    match md[0]:
+        case '#':
+            total_hash = 1
+            for i in range(1, len(md)):
+                if md[i] == '#':
+                    total_hash += 1
+                    if total_hash > 6:
+                        return BlockType.PARAGRAPH
+                    continue
+                elif md[i] == ' ':
+                    return BlockType.HEADING
+                return BlockType.PARAGRAPH
+        case '`':
+            if len(md) < 6:
+                return BlockType.PARAGRAPH
+            if md[:3] == '```' and md[-3:] == '```':
+                return BlockType.CODE
+            return BlockType.PARAGRAPH
+        case '>':
+            lines = md.splitlines()
+            for line in lines:
+                if line[0] != '>':
+                    return BlockType.PARAGRAPH
+            return BlockType.QUOTE
+        case '-':
+            lines = md.splitlines()
+            for line in lines:
+                if line[0:2] != '- ':
+                    return BlockType.PARAGRAPH
+            return BlockType.UNORDERED_LIST
+        case '1':
+            lines = md.splitlines()
+            tally = 1
+            for line in lines:
+                if line[0:3] != f"{tally}. ":
+                    return BlockType.PARAGRAPH
+                tally += 1
+            return BlockType.ORDERED_LIST
+        case _:
+            return BlockType.PARAGRAPH
