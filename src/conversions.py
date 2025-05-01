@@ -1,29 +1,26 @@
 import re
 
-from htmlnode import BlockType
+from htmlnode import BlockType, ParentNode, LeafNode, HTMLNode
 from textnode import TextType, TextNode
 
 def split_nodes_delimiter(old_nodes, delimiter, text_type):
     new_nodes = []
-    for node in old_nodes:
-        if node.text_type != TextType.NORMAL:
-            new_nodes.append(node)
+    for old_node in old_nodes:
+        if old_node.text_type != TextType.NORMAL:
+            new_nodes.append(old_node)
             continue
-
-        delimiter_start_location = node.text.find(delimiter)
-        if delimiter_start_location == -1:
-            new_nodes.append(node)
-            continue
-        delimiter_end_location = node.text.find(delimiter, delimiter_start_location+len(delimiter))
-        if delimiter_end_location == -1:
-            raise Exception("closing delimiter not found in node")
-        
-        beginning_node = TextNode(node.text[:delimiter_start_location], TextType.NORMAL)
-        middle_node = TextNode(node.text[delimiter_start_location+len(delimiter):delimiter_end_location], text_type)
-        end_node = TextNode(node.text[delimiter_end_location+len(delimiter):], TextType.NORMAL)
-        new_nodes.append(beginning_node)
-        new_nodes.append(middle_node)
-        new_nodes.append(end_node)
+        split_nodes = []
+        sections = old_node.text.split(delimiter)
+        if len(sections) % 2 == 0:
+            raise ValueError("invalid markdown, formatted section not closed")
+        for i in range(len(sections)):
+            if sections[i] == "":
+                continue
+            if i % 2 == 0:
+                split_nodes.append(TextNode(sections[i], TextType.NORMAL))
+            else:
+                split_nodes.append(TextNode(sections[i], text_type))
+        new_nodes.extend(split_nodes)
     return new_nodes
 
 def extract_markdown_images(text):
@@ -95,16 +92,22 @@ def text_to_textnodes(text):
     nodes = split_nodes_link(nodes)
     return nodes
 
-def strip_lines(blocks, index):
-    block_lines = blocks[index].splitlines()
-    i = 0
-    while i < len(block_lines):
-        block_lines[i] = block_lines[i].strip()
-        if len(block_lines[i]) == 0:
-            block_lines.pop(i)
-            continue
-        i += 1
-    blocks[index] = '\n'.join(block_lines)
+def text_node_to_html_node(text_node):
+    match text_node.text_type:
+        case TextType.NORMAL:
+            return LeafNode(None, text_node.text)
+        case TextType.BOLD:
+            return LeafNode("b", text_node.text)
+        case TextType.ITALIC:
+            return LeafNode("i", text_node.text)
+        case TextType.CODE:
+            return LeafNode("code", text_node.text)
+        case TextType.LINK:
+            return LeafNode("a", text_node.text, {"href": text_node.url})
+        case TextType.IMAGE:
+            return LeafNode("img", "", {"src":text_node.url, "alt":text_node.text})
+        case _:
+            raise Exception("invalid text type")
 
 def markdown_to_blocks(markdown):
     blocks = markdown.split('\n\n')
@@ -119,8 +122,6 @@ def markdown_to_blocks(markdown):
     return blocks
 
 def block_to_block_type(md):
-    print("***************************")
-    print(f"Block length: {len(md)}\nBlock:\n{md}")
     if len(md) == 0:
         raise Exception("empty block has no block type")
     
@@ -164,3 +165,76 @@ def block_to_block_type(md):
             return BlockType.ORDERED_LIST
         case _:
             return BlockType.PARAGRAPH
+        
+def count_heading(block):
+    count = 0
+    for char in block:
+        if char == '#':
+            count += 1
+        else:
+            return count
+        
+def block_to_html_node(block, block_type):
+    if block_type == BlockType.CODE:
+        return ParentNode("pre", [text_node_to_html_node(TextNode(block.strip('`').lstrip('\n'), TextType.CODE))])
+    
+    match block_type:
+        case BlockType.PARAGRAPH:
+            block = block.replace('\n', ' ')
+            textnodes = text_to_textnodes(block)
+            children = list(map(text_node_to_html_node, textnodes))
+            return ParentNode("p", children)
+        case BlockType.HEADING:
+            heading_count = count_heading(block)
+            block = block.replace('\n', ' ').lstrip('# ')
+            textnodes = text_to_textnodes(block)
+            children = list(map(text_node_to_html_node, textnodes))
+            return ParentNode(f"h{heading_count}", children)
+        case BlockType.QUOTE:
+            lines = block.splitlines()
+            for i in range(0, len(lines)):
+                lines[i] = lines[i].lstrip("> ")
+            block = '\n'.join(lines)
+            textnodes = text_to_textnodes(block)
+            children = list(map(text_node_to_html_node, textnodes))
+            return ParentNode("blockquote", children)
+        case BlockType.UNORDERED_LIST:
+            children = []
+            lines = block.splitlines()
+            for line in lines:
+                line = line.lstrip('- ')
+                textnodes = text_to_textnodes(line)
+                nested_children = list(map(text_node_to_html_node, textnodes))
+                children.append(ParentNode('li', nested_children))
+            return ParentNode("ul", children)
+        case BlockType.ORDERED_LIST:
+            children = []
+            lines = block.splitlines()
+            for line in lines:
+                line = line.lstrip('0123456789. ')
+                textnodes = text_to_textnodes(line)
+                nested_children = list(map(text_node_to_html_node, textnodes))
+                children.append(ParentNode('li', nested_children))
+            return ParentNode("ol", children)
+        case _:
+            raise Exception("invalid block type")
+    
+        
+def markdown_to_html_node(document):
+    blocks = markdown_to_blocks(document)
+    new_nodes = []
+    for block in blocks:
+        block_type = block_to_block_type(block)
+        new_nodes.append(block_to_html_node(block, block_type))
+    parent = ParentNode("div", new_nodes)
+    return parent
+    
+def extract_title(md):
+    blocks = markdown_to_blocks(md)
+    for block in blocks:
+        if block_to_block_type(block) == BlockType.HEADING:
+            heading_count = count_heading(block)
+            if heading_count == 1:
+                return block[2:]
+    raise Exception("h1 heading / title missing")
+    

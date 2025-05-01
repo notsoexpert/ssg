@@ -1,7 +1,7 @@
 import unittest
 
 from htmlnode import BlockType, HTMLNode, LeafNode, ParentNode
-from conversions import markdown_to_blocks, block_to_block_type
+from conversions import markdown_to_blocks, block_to_block_type, markdown_to_html_node, extract_title
 
 class TestHTMLNode(unittest.TestCase):
     def test_eq(self):
@@ -178,15 +178,9 @@ you know...```
 
 bigot
     """
-            def print_b2bt(md):
-                type = block_to_block_type(md)
-                print(f"Block type: {type}")
-                return type
             
             blocks = markdown_to_blocks(md)
-            print(f"Blocks of length: {len(blocks)}\nBlocks:\n{blocks}")
-            block_types = list(map(print_b2bt, blocks))
-            print(f"Block types of length: {len(block_types)}\n{block_types}")
+            block_types = list(map(block_to_block_type, blocks))
             self.assertEqual(
                 block_types,
                 [
@@ -207,6 +201,160 @@ bigot
                     BlockType.PARAGRAPH
                 ]
             )
+    def test_paragraphs(self):
+        md = """
+This is **bolded** paragraph
+text in a p
+tag here
+
+This is another paragraph with _italic_ text and `code` here
+
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><p>This is <b>bolded</b> paragraph text in a p tag here</p><p>This is another paragraph with <i>italic</i> text and <code>code</code> here</p></div>",
+        )
+
+    def test_codeblock(self):
+        md = """
+```
+This is text that _should_ remain
+the **same** even with inline stuff
+```
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><pre><code>This is text that _should_ remain\nthe **same** even with inline stuff\n</code></pre></div>",
+        )
+
+    def test_headings(self):
+        md = """
+# Head1
+
+## Head2
+
+### Head3
+
+#### Head4
+
+##### Head5
+
+###### Head 6
+CHECKING
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><h1>Head1</h1><h2>Head2</h2><h3>Head3</h3><h4>Head4</h4><h5>Head5</h5><h6>Head 6 CHECKING</h6></div>",
+        )
+    
+    def test_quote(self):
+        md = """
+> Quote 1 with **bold** text
+
+> Quote 2 with > < angle brackets and _italic_ text
+
+> Quote 3 with **bold** and _italic_ text
+
+> Quote 4 with nothing else
+
+> Quote 5 with a `code` section next to an _italic_ section
+
+> Quote 6 with a [link](www.google.com)
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><blockquote>Quote 1 with <b>bold</b> text</blockquote><blockquote>Quote 2 with > < angle brackets and <i>italic</i> text</blockquote><blockquote>Quote 3 with <b>bold</b> and <i>italic</i> text</blockquote><blockquote>Quote 4 with nothing else</blockquote><blockquote>Quote 5 with a <code>code</code> section next to an <i>italic</i> section</blockquote><blockquote>Quote 6 with a <a href=\"www.google.com\">link</a></blockquote></div>",
+        )
+    
+    def test_unordered_list(self):
+        md = """
+- List 1 Item 1
+- List 1 Item 2
+- List 1 Item 3
+
+- List 2 Item 1
+- List 2 Item 2 with **bold** text
+
+- List 3 is only 1 item
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><ul><li>List 1 Item 1</li><li>List 1 Item 2</li><li>List 1 Item 3</li></ul><ul><li>List 2 Item 1</li><li>List 2 Item 2 with <b>bold</b> text</li></ul><ul><li>List 3 is only 1 item</li></ul></div>",
+        )
+
+    def test_ordered_list(self):
+        md = """
+1. List 1 Item 1
+2. List 1 Item 2
+3. List 1 Item 3
+
+1. List 2 Item 1
+2. List 2 Item 2 with **bold** text
+
+1. List 3 is only 1 item
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><ol><li>List 1 Item 1</li><li>List 1 Item 2</li><li>List 1 Item 3</li></ol><ol><li>List 2 Item 1</li><li>List 2 Item 2 with <b>bold</b> text</li></ol><ol><li>List 3 is only 1 item</li></ol></div>",
+        )
+    
+    def test_extract_title_1(self):
+        md = "# Hello"
+        title = extract_title(md)
+        self.assertEqual(
+            title,
+            "Hello"
+        )
+
+    def test_extract_title_2(self):
+        md = "# Hello"
+        title = extract_title(md)
+        self.assertEqual(
+            title,
+            "Hello"
+        )
+
+    def test_extract_title_2(self):
+        md = "Hello"
+        try:
+            title = extract_title(md)
+        except Exception as e:
+            self.assertEqual(e.__repr__(), "Exception('h1 heading / title missing')")
+
+    def test_extract_title_3(self):
+        md = """
+        Hello!
+
+        There's no # way this is a title heading!
+        
+        ## Testing Testing
+
+        # Title
+        """
+        title = extract_title(md)
+        self.assertEqual(
+            title,
+            "Title"
+        )
+
         
 if __name__ == "__main__":
     unittest.main()
