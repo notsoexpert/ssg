@@ -1,13 +1,15 @@
 import os
 import shutil
+import sys
 
 from textnode import TextType, TextNode
 from htmlnode import ParentNode, LeafNode
 from conversions import markdown_to_html_node, extract_title
 
 def main():
+    basepath = sys.argv[1] if len(sys.argv) > 1 else '/'
     preprocess()
-    generate_pages_recursive("./content/", "./template.html", "./public/")
+    generate_pages_recursive(f"{basepath}content/", f"{basepath}template.html", f"{basepath}public/")
 
 def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
     # First, get a list of files and directories in this directory
