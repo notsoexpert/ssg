@@ -8,10 +8,10 @@ from conversions import markdown_to_html_node, extract_title
 
 def main():
     basepath = sys.argv[1] if len(sys.argv) > 1 else '/'
-    preprocess()
-    generate_pages_recursive(f"{basepath}content/", f"{basepath}template.html", f"{basepath}public/")
+    preprocess("./static", "./docs")
+    generate_pages_recursive(basepath, "./content/", "./template.html", "./docs/")
 
-def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+def generate_pages_recursive(basepath, dir_path_content, template_path, dest_dir_path):
     # First, get a list of files and directories in this directory
     dir_contents = os.listdir(dir_path_content)
 
@@ -22,13 +22,13 @@ def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
             # Ignore non-markdown files
             if not content[-3:] == '.md':
                 continue
-            generate_page(dir_path_content+content, template_path, dest_dir_path+content.replace('.md', '.html'))
+            generate_page(basepath, dir_path_content+content, template_path, dest_dir_path+content.replace('.md', '.html'))
         else:
-            generate_pages_recursive(dir_path_content+content+"/", template_path, dest_dir_path+content+'/')
+            generate_pages_recursive(basepath, dir_path_content+content+"/", template_path, dest_dir_path+content+'/')
 
     
 
-def generate_page(from_path, template_path, dest_path):
+def generate_page(basepath, from_path, template_path, dest_path):
     md_file = open(from_path)
     md = md_file.read()
     md_file.close()
@@ -42,7 +42,7 @@ def generate_page(from_path, template_path, dest_path):
 
     title = extract_title(md)
 
-    dest = template.replace("{{ Title }}", title).replace("{{ Content }}", html_string)
+    dest = template.replace("{{ Title }}", title).replace("{{ Content }}", html_string).replace("href=\"/", f"href=\"{basepath}").replace("src=\"/", f"src=\"{basepath}")
 
     dest_dir = os.path.dirname(dest_path)
     if not os.path.exists(dest_dir):
@@ -53,9 +53,9 @@ def generate_page(from_path, template_path, dest_path):
     dest_file.close()
 
 
-def preprocess():
-    if os.path.exists("./public"):
-        shutil.rmtree("./public", False)
-    shutil.copytree("./static","./public")
+def preprocess(static_path, output_path):
+    if os.path.exists(output_path):
+        shutil.rmtree(output_path, False)
+    shutil.copytree(static_path,output_path)
 
 main()
